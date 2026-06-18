@@ -1,0 +1,442 @@
+#include <iostream>
+#include <string>
+#include <fstream> 
+#include <map>     
+
+using namespace std;
+
+class IDrukowalny {
+    public:
+        virtual string przedstawsie() = 0;
+        virtual ~IDrukowalny() {}
+};
+
+class Osoba : public IDrukowalny {
+    private:
+        string imie;
+        string nazwisko;
+    public:
+        int typ; // 1 = Student, 2 = Stazysta, 3 = StudentZaoczny
+
+        Osoba() : imie(""), nazwisko(""), typ(0) {}
+
+        string przedstawsie() { return "Osoba "; }
+
+        // Metoda eksportująca dane podstawowe do mapy
+        virtual map<string, string> eksportuj() {
+            map<string, string> m;
+            m["Typ"] = to_string(typ);
+            m["Imie"] = imie;
+            m["Nazwisko"] = nazwisko;
+            return m;
+        }
+
+        int setImie(string wartosc) {
+            if(wartosc.length() <= 2) return -1;
+            imie = wartosc;
+            return 0;
+        }
+        string getImie() { return imie; }
+
+        int setNazwisko(string wartosc) {
+            if(wartosc.length() <= 2) return -1;
+            nazwisko = wartosc;
+            return 0;
+        }
+        string getNazwisko() { return nazwisko; }
+
+        bool pusty() { return nazwisko == ""; }
+
+        void drukuj(IDrukowalny* d) {
+            if(d != nullptr) {
+                cout << d->przedstawsie();
+            }
+            cout << imie << " " << nazwisko;
+        }
+};
+
+class Student : public Osoba {
+    private:
+        int indeks;
+    public:
+        Student() : Osoba(), indeks(0) { typ = 1; }
+
+        void setIndeks(int wartosc) { indeks = wartosc; }
+        int getIndeks() { return indeks; }
+
+        string przedstawsie() { return "Student, indeks: " + to_string(indeks) + " | "; }
+
+        // Rozszerzamy eksport o indeks
+        map<string, string> eksportuj() override {
+            map<string, string> m = Osoba::eksportuj();
+            m["Indeks"] = to_string(indeks);
+            return m;
+        }
+};
+
+class StudentZaoczny : public Student {
+    public:
+        StudentZaoczny() : Student() { typ = 3; }
+
+        string przedstawsie() { return "Student Zaoczny, indeks: " + to_string(getIndeks()) + " | "; }
+
+        // Dodatkowy znacznik trybu dla studenta zaocznego
+        map<string, string> eksportuj() override {
+            map<string, string> m = Student::eksportuj();
+            m["Tryb"] = "Zaoczny";
+            return m;
+        }
+};
+
+class Stazysta : public Osoba {
+    private:
+        int idPracownika;
+    public:
+        Stazysta() : Osoba(), idPracownika(0) { typ = 2; }
+
+        void setIdPracownika(int id) { idPracownika = id; }
+        int getIdPracownika() { return idPracownika; }
+
+        string przedstawsie() { return "Stazysta, ID: " + to_string(idPracownika) + " | "; }
+
+        // Rozszerzamy eksport o ID pracownika
+        map<string, string> eksportuj() override {
+            map<string, string> m = Osoba::eksportuj();
+            m["IdPracownika"] = to_string(idPracownika);
+            return m;
+        }
+};
+
+// Deklaracja wyprzedzająca, aby ListaObecnosci wiedziała o istnieniu klasy eksportującej
+class ExporterTXT;
+
+class ListaObecnosci {
+    // Dajemy klasie ExporterTXT pełny dostęp do prywatnych pól listy
+    friend class ExporterTXT;
+
+    public:
+        void drukuj() {
+            cout << "\n--- Lista: " << nazwa << " ---\n";
+            if(iloscOsob == 0) { cout << "Lista jest pusta.\n"; return; }
+            for(int i = 0; i < iloscOsob; i++) {
+                tabOsob[i]->drukuj(tabOsob[i]);
+                cout << " " << (tabObecny[i] ? "OBECNY" : "NIEOBECNY") << "\n";
+            }
+            cout << "----------------------\n";
+        }
+
+        void dodajOsobe(Osoba* osoba) {
+            if(iloscOsob >= 10) { cout << "Lista jest pelna!\n"; return; }
+            tabOsob[iloscOsob] = osoba;
+            tabObecny[iloscOsob] = false;
+            iloscOsob++;
+            cout << "Osoba dodana do listy.\n";
+        }
+
+        void ustawObecnosc(int id, bool obecnosc) {
+            for(int i = 0; i < iloscOsob; i++) {
+                if(tabOsob[i]->typ == 1 && ((Student*)tabOsob[i])->getIndeks() == id) {
+                    tabObecny[i] = obecnosc;
+                    cout << "Obecnosc ustawiona.\n";
+                    return;
+                }
+                if(tabOsob[i]->typ == 2 && ((Stazysta*)tabOsob[i])->getIdPracownika() == id) {
+                    tabObecny[i] = obecnosc;
+                    cout << "Obecnosc ustawiona.\n";
+                    return;
+                }
+                if(tabOsob[i]->typ == 3 && ((StudentZaoczny*)tabOsob[i])->getIndeks() == id) {
+                    tabObecny[i] = obecnosc;
+                    cout << "Obecnosc ustawiona.\n";
+                    return;
+                }
+            }
+            cout << "Nie znaleziono osoby na liscie.\n";
+        }
+
+        void usunOsobe(int id) {
+            for(int i = 0; i < iloscOsob; i++) {
+                bool found = false;
+                if(tabOsob[i]->typ == 1 && ((Student*)tabOsob[i])->getIndeks() == id) found = true;
+                if(tabOsob[i]->typ == 2 && ((Stazysta*)tabOsob[i])->getIdPracownika() == id) found = true;
+                if(tabOsob[i]->typ == 3 && ((StudentZaoczny*)tabOsob[i])->getIndeks() == id) found = true;
+                if(found) {
+                    for(int j = i; j < iloscOsob - 1; j++) {
+                        tabOsob[j] = tabOsob[j+1];
+                        tabObecny[j] = tabObecny[j+1];
+                    }
+                    iloscOsob--;
+                    cout << "Osoba usunieta z listy.\n";
+                    return;
+                }
+            }
+            cout << "Nie znaleziono osoby na liscie.\n";
+        }
+
+        void setNazwa(string n) { nazwa = n; }
+        string getNazwa() { return nazwa; }
+
+    private:
+        string nazwa;
+        Osoba* tabOsob[10];
+        bool tabObecny[10];
+        int iloscOsob = 0;
+};
+
+// Nowa klasa żądana w poleceniu
+class ExporterTXT {
+    public:
+        // Wariant 1: Eksport pojedynczej osoby
+        static void wykonajExport(string nazwaPliku, Osoba* obj) {
+            ofstream plik(nazwaPliku);
+            if (!plik.is_open()) {
+                cout << "Blad: Nie udalo sie otworzyc pliku do zapisu!\n";
+                return;
+            }
+
+            map<string, string> dane = obj->eksportuj();
+            map<string, string>::iterator it;
+            
+            plik << "--- EKSPORT OSOBY ---\n";
+            for (it = dane.begin(); it != dane.end(); ++it) {
+                plik << it->first << ":" << it->second << "\n";
+            }
+            
+            plik.close();
+            cout << "Pomyslnie wyeksportowano osobe do pliku: " << nazwaPliku << "\n";
+        }
+
+        // Wariant 2: Eksport całej listy obecności
+        static void wykonajExport(string nazwaPliku, ListaObecnosci* lista) {
+            ofstream plik(nazwaPliku);
+            if (!plik.is_open()) {
+                cout << "Blad: Nie udalo sie otworzyc pliku do zapisu!\n";
+                return;
+            }
+
+            plik << "LISTA_OBECNOSCI:" << lista->getNazwa() << "\n";
+            plik << "ILOSC_OSOB:" << lista->iloscOsob << "\n";
+            
+            for (int i = 0; i < lista->iloscOsob; i++) {
+                plik << "=== Osoba " << i + 1 << " ===\n";
+                
+                map<string, string> dane = lista->tabOsob[i]->eksportuj();
+                map<string, string>::iterator it;
+                
+                for (it = dane.begin(); it != dane.end(); ++it) {
+                    plik << it->first << ":" << it->second << "\n";
+                }
+                plik << "Obecnosc:" << (lista->tabObecny[i] ? "1" : "0") << "\n";
+            }
+
+            plik.close();
+            cout << "Pomyslnie wyeksportowano liste do pliku: " << nazwaPliku << "\n";
+        }
+};
+
+class InterfejsUzytkownika {
+    public:
+        InterfejsUzytkownika(Osoba** tabOsob, ListaObecnosci* tabLista)
+            : tabOsob(tabOsob), tabLista(tabLista), iloscOsob(0), iloscList(0) {}
+
+        ~InterfejsUzytkownika() {
+            for(int i = 0; i < iloscOsob; i++)
+                delete tabOsob[i];
+        }
+
+        void loop() {
+            int wybor = 0;
+            while(wybor != 12) {
+                cout << "\nWybierz dzialanie:\n";
+                cout << "1. Dodaj studenta.\n";
+                cout << "2. Dodaj stazyste.\n";
+                cout << "3. Dodaj studenta zaocznego.\n";
+                cout << "4. Dodaj liste obecnosci.\n";
+                cout << "5. Dodaj osobe do listy.\n";
+                cout << "6. Ustaw obecnosc.\n";
+                cout << "7. Usun osobe z listy.\n";
+                cout << "8. Zmien dane osoby.\n";
+                cout << "9. Wyswietl liste obecnosci.\n";
+                cout << "10. Eksportuj pojedyncza osobe do TXT.\n";
+                cout << "11. Eksportuj cala liste do TXT.\n";
+                cout << "12. Zakoncz program.\n";
+                cin >> wybor;
+
+                switch(wybor) {
+                    case 1: dodajStudenta();     break;
+                    case 2: dodajStazyste();     break;
+                    case 3: dodajStudentaZaocznego(); break;
+                    case 4: dodajListe();        break;
+                    case 5: dodajOsobeDoListy(); break;
+                    case 6: ustawObecnosc();     break;
+                    case 7: usunOsobeZListy();   break;
+                    case 8: zmienDane();         break;
+                    case 9: wyswietlListe();     break;
+                    case 10: eksportujOsobe();   break;
+                    case 11: eksportujListe();   break;
+                    case 12:                     break;
+                    default: cout << "Nieprawidlowy wybor!\n"; break;
+                }
+            }
+        }
+
+    private:
+        Osoba** tabOsob;
+        int iloscOsob;
+        ListaObecnosci* tabLista;
+        int iloscList;
+
+        Osoba* znajdzOsobe(int id) {
+            for(int i = 0; i < iloscOsob; i++) {
+                if(tabOsob[i]->typ == 1 && ((Student*)tabOsob[i])->getIndeks() == id)
+                    return tabOsob[i];
+                if(tabOsob[i]->typ == 2 && ((Stazysta*)tabOsob[i])->getIdPracownika() == id)
+                    return tabOsob[i];
+                if(tabOsob[i]->typ == 3 && ((StudentZaoczny*)tabOsob[i])->getIndeks() == id)
+                    return tabOsob[i];
+            }
+            return nullptr;
+        }
+
+        int wybierzListe() {
+            cout << "Dostepne listy:\n";
+            for(int i = 0; i < iloscList; i++)
+                cout << i << ". " << tabLista[i].getNazwa() << "\n";
+            cout << "Podaj numer listy: ";
+            int nr; cin >> nr;
+            if(nr < 0 || nr >= iloscList) { cout << "Nieprawidlowy nr listy.\n"; return -1; }
+            return nr;
+        }
+
+        void dodajStudenta() {
+            if(iloscOsob >= 10) { cout << "Baza osob jest pelna!\n"; return; }
+            string imie, nazwisko;
+            int indeks;
+            cout << "Podaj imie: ";       cin >> imie;
+            cout << "Podaj nazwisko: ";   cin >> nazwisko;
+            cout << "Podaj nr indeksu: "; cin >> indeks;
+            Student* s = new Student();
+            s->setImie(imie);
+            s->setNazwisko(nazwisko);
+            s->setIndeks(indeks);
+            tabOsob[iloscOsob] = s;
+            iloscOsob++;
+            cout << "Student dodany.\n";
+        }
+
+        void dodajStudentaZaocznego() {
+            if(iloscOsob >= 10) { cout << "Baza osob jest pelna!\n"; return; }
+            string imie, nazwisko;
+            int indeks;
+            cout << "Podaj imie: ";       cin >> imie;
+            cout << "Podaj nazwisko: ";   cin >> nazwisko;
+            cout << "Podaj nr indeksu: "; cin >> indeks;
+            StudentZaoczny* sz = new StudentZaoczny();
+            sz->setImie(imie);
+            sz->setNazwisko(nazwisko);
+            sz->setIndeks(indeks);
+            tabOsob[iloscOsob] = sz;
+            iloscOsob++;
+            cout << "Student zaoczny dodany.\n";
+        }
+
+        void dodajStazyste() {
+            if(iloscOsob >= 10) { cout << "Baza osob jest pelna!\n"; return; }
+            string imie, nazwisko;
+            int idPracownika;
+            cout << "Podaj imie: ";          cin >> imie;
+            cout << "Podaj nazwisko: ";      cin >> nazwisko;
+            cout << "Podaj ID pracownika: "; cin >> idPracownika;
+            Stazysta* st = new Stazysta();
+            st->setImie(imie);
+            st->setNazwisko(nazwisko);
+            st->setIdPracownika(idPracownika);
+            tabOsob[iloscOsob] = st;
+            iloscOsob++;
+            cout << "Stazysta dodany.\n";
+        }
+
+        void dodajListe() {
+            if(iloscList >= 2) { cout << "Osiagnieto limit list!\n"; return; }
+            string nazwa;
+            cout << "Podaj nazwe listy: "; cin >> nazwa;
+            tabLista[iloscList].setNazwa(nazwa);
+            iloscList++;
+            cout << "Lista stworzona.\n";
+        }
+
+        void dodajOsobeDoListy() {
+            int nr = wybierzListe();
+            if(nr == -1) return;
+            int id;
+            cout << "Podaj indeks (student) lub ID pracownika (stazysta): "; cin >> id;
+            Osoba* o = znajdzOsobe(id);
+            if(o == nullptr) { cout << "Nie znaleziono osoby.\n"; return; }
+            tabLista[nr].dodajOsobe(o);
+        }
+
+        void ustawObecnosc() {
+            int nr = wybierzListe();
+            if(nr == -1) return;
+            int id;
+            bool obecnosc;
+            cout << "Podaj indeks (student) lub ID pracownika (stazysta): "; cin >> id;
+            cout << "Podaj obecnosc (0/1): "; cin >> obecnosc;
+            tabLista[nr].ustawObecnosc(id, obecnosc);
+        }
+
+        void usunOsobeZListy() {
+            int nr = wybierzListe();
+            if(nr == -1) return;
+            int id;
+            cout << "Podaj indeks (student) lub ID pracownika (stazysta): "; cin >> id;
+            tabLista[nr].usunOsobe(id);
+        }
+
+        void wyswietlListe() {
+            int nr = wybierzListe();
+            if(nr == -1) return;
+            tabLista[nr].drukuj();
+        }
+
+        void zmienDane() {
+            int id;
+            cout << "Podaj indeks (student) lub ID pracownika (stazysta): "; cin >> id;
+            Osoba* o = znajdzOsobe(id);
+            if(o == nullptr) { cout << "Nie znaleziono osoby.\n"; return; }
+            string imie, nazwisko;
+            cout << "Podaj nowe imie: ";     cin >> imie;
+            cout << "Podaj nowe nazwisko: "; cin >> nazwisko;
+            o->setImie(imie);
+            o->setNazwisko(nazwisko);
+            cout << "Dane zmienione.\n";
+        }
+
+        // Nowe metody interfejsu obsługujące żądanie eksportu
+        void eksportujOsobe() {
+            int id;
+            cout << "Podaj indeks lub ID pracownika osoby do eksportu: "; cin >> id;
+            Osoba* o = znajdzOsobe(id);
+            if(o == nullptr) { cout << "Nie znaleziono osoby.\n"; return; }
+            
+            string plik;
+            cout << "Podaj nazwe pliku wyjsciowego (np. osoba.txt): "; cin >> plik;
+            ExporterTXT::wykonajExport(plik, o);
+        }
+
+        void eksportujListe() {
+            int nr = wybierzListe();
+            if(nr == -1) return;
+            
+            string plik;
+            cout << "Podaj nazwe pliku wyjsciowego (np. lista.txt): "; cin >> plik;
+            ExporterTXT::wykonajExport(plik, &tabLista[nr]);
+        }
+};
+
+int main() {
+    Osoba* tabOsob[10] = {};
+    ListaObecnosci tabLista[2];
+    InterfejsUzytkownika ui(tabOsob, tabLista);
+    ui.loop();
+}
